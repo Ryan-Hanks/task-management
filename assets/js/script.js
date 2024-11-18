@@ -2,6 +2,22 @@
 let taskList = JSON.parse(localStorage.getItem("tasks"));
 let nextId = JSON.parse(localStorage.getItem("nextId"));
 
+
+function readTasksFromStorage() {
+    let tasks = tasklist;
+    console.log(tasks);
+
+    if (!tasks) {
+        tasks = [];
+    }
+
+    return tasks;
+}
+
+function saveTasksToStorage(tasks) {
+    localStorage.setItem('tasks', JSON.stringify(tasks));
+}
+
 // Todo: create a function to generate a unique task id
 function generateTaskId() {
     if (nextId === null) {
@@ -30,9 +46,21 @@ function createTaskCard(task) {
  const cardDescription = $("<p>");
  cardDescription.addClass("card-text");
  cardDescription.text(task.description);
+
+ const cardDueDate = $('<p>');
+ cardDueDate.addClass("card-text");
+ cardDueDate.text(task.dueDate);
+
+ const cardDeleteBtn = $('<button>');
+ cardDeleteBtn.addClass('btn btn-danger delete');
+ cardDeleteBtn.text('Delete');
+ cardDeleteBtn.attr('data-task-id');
+
+ cardDeleteBtn.on('click', handleDeleteTask);
  
- cardBody.append(cardDescription);
- card.append(CardHeader, cardBody);
+ cardBody.append(cardDescription, cardDueDate, cardDeleteBtn);
+ card.append(cardHeader, cardBody);
+ console.log(card);
  return card;
 }
 
@@ -51,9 +79,7 @@ function renderTaskList() {
     const completeList = $("#done-cards");
     completeList.empty();
 
-    for (let index = 0; index < taskList.length; index++) {
-        const task = taskList[index];
-
+    for (let task of taskList) {
         if(task.status === "to-do"){
             todoList.append(createTaskCard(task));
         } else if(task.status === "in-progress"){
@@ -63,27 +89,34 @@ function renderTaskList() {
         }
     };
 
-    $('.draggable').draggable({});
+    $('.draggable').draggable({
+        opacity: 0.7,
+        zIndex: 100,
+        helper: function (e) {
+            const original = $(e.target).hasClass('ui-draggable')
+                ? $(e.target)
+                : $(e.target).closest('.ui-draggable');
+            return original.clone().css({
+                width: original.outerWidth(),
+            });
+        },
+    });
 }
 
 // Todo: create a function to handle adding a new task
 function handleAddTask(event){
     event.preventDefault();
 
-    const title = $('#taskTitle').val();
-    const description = $('#taskDescription').val();
-    const dueDate = $('#taskDueDate').val();
-
     const task = {
         id: generateTaskId(),
-        title,
-        description,
-        dueDate,
+        title: $('#taskTitle').val(),
+        description: $('#taskDescription').val(),
+        dueDate: $('#taskDueDate').val(),
         status: 'to-do',
     };
 
     taskList.push(task);
-    localStorage.setItem("tasks", JSON.stringify(taskList));
+    saveTasksToStorage(taskList)
     renderTaskList();
 
     $('#taskTitle').val('');
@@ -93,11 +126,40 @@ function handleAddTask(event){
 
 // Todo: create a function to handle deleting a task
 function handleDeleteTask(event){
+    event.preventDefault();
+    const taskId = $(this).attr('data-id');
+    const tasks = readTasksFromStorage();
 
+
+    tasks.forEach((task) => {
+        if (task.id === taskId) {
+            tasks.splice(tasks.indexOf(task), 1);
+        }
+    });
+
+    saveTasksToStorage(tasks);
+
+    renderTaskList();
 }
 
 // Todo: create a function to handle dropping a task into a new status lane
 function handleDrop(event, ui) {
+    event.preventDefault();
+
+    const tasks = readTasksFromStorage();
+
+    const taskID = ui.draggable.attr('data-task-id');
+
+    const newStatus = event.target.id;
+
+    for (let task of tasks) {
+        if (task.id === taskID) {
+            task.status = newStatus;
+        }
+    }
+
+    saveTasksToStorage(tasks);
+    renderTaskList();
 
 }
 
@@ -105,7 +167,7 @@ function handleDrop(event, ui) {
 $(document).ready(function () {
     renderTaskList();
 
-    $('task-form').on("submit", handleAddTask);
+    $('#taskForm').on("submit", handleAddTask);
 
     $(".lane").droppable({
         accept: ".draggable",
